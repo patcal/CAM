@@ -165,6 +165,12 @@
     <lname>2000_CAM%KESSLER_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>FFRIERSON</alias>
+    <lname>2000_CAM%FRIERSON_SLND_SICE_DOCN%SIMPLESOM_SROF_SGLC_SWAV</lname>
+  </compset>
+
+
   <!-- PORT compsets -->
   <compset>
     <alias>PC4</alias>

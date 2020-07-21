@@ -54,6 +54,121 @@
           that have only a small number of allowed values.
                                                                         -->
 
+<!-- Frierson Simple Physics Parameters -->
+
+<entry id="frierson_T0" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 273.16
+       </entry>
+
+<entry id="frierson_E0" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 610.78
+       </entry>
+
+<entry id="frierson_Erad" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 6.376d6
+       </entry>
+
+<entry id="frierson_Wind_min" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 1.0d-5
+       </entry>
+
+<entry id="frierson_Z0" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 3.21d-5
+       </entry>
+
+<entry id="frierson_Ri_c" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 1.0
+       </entry>
+
+<entry id="frierson_Karman" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 0.4
+       </entry>
+
+<entry id="frierson_Fb" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 0.1
+       </entry>
+
+<entry id="frierson_Rs0" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 938.4
+       </entry>
+
+<entry id="frierson_DeltaS" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 1.4
+       </entry>
+
+<entry id="frierson_Tau_eqtr" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 6.0
+       </entry>
+
+<entry id="frierson_Tau_pole" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 1.5
+       </entry>
+
+<entry id="frierson_LinFrac" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 0.1
+       </entry>
+
+<entry id="frierson_Boltz" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 5.6734d-8
+       </entry>
+<entry id="frierson_C0" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 1.e7
+       </entry>
+
+<entry id="frierson_Tmin" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 271.
+       </entry>
+
+<entry id="frierson_Tdlt" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 39.
+       </entry>
+
+<entry id="frierson_Twidth" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 26.
+       </entry>
+
+<entry id="frierson_WetDryCoef" type="real" category="frierson"
+       group="frierson_nl" valid_values="" >
+       Frierson Simple Physics Parameter.
+       Default: 1.
+       </entry>
+
 <!-- Nudging Parameters -->
 
 <entry id="Nudge_Model" type="logical" category="nudging"

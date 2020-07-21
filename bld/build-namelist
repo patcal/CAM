@@ -570,7 +570,7 @@ if ($phys eq 'adiabatic') {
     ++$phys_mode_flags;
 }
 my $ideal_mode = 0;
-if ($phys eq 'kessler' or $phys eq 'held_suarez' or $phys eq 'tj2016') {
+if ($phys eq 'kessler' or $phys eq 'held_suarez' or $phys eq 'tj2016' or $phys eq 'frierson' ) {
     $ideal_mode = 1;
     ++$phys_mode_flags;
 }
@@ -3607,7 +3607,7 @@ my $bndtvs_domain = '';
 my $focndomain = '';
 
 # Namelist settings for CAMDOM or DOCN
-if ($cam_build and  ($ocn_comp =~ /docn|dom|som/)) {
+if ($cam_build and  ($ocn_comp =~ /docn|dom|som|simplesom/)) {
 
     # bndtvs
     add_default($nl, 'bndtvs', 'sim_year'=>$sim_year);
@@ -3637,7 +3637,7 @@ if ($cam_build and  ($ocn_comp =~ /docn|dom|som/)) {
 
 # Create docn namelists and stream txt file
 
-if ($cam_build and  ($ocn_comp =~ /docn|som/)) {
+if ($cam_build and  ($ocn_comp =~ /docn|som|simplesom/)) {
 
     my  $fh = new IO::File;
 
@@ -3662,6 +3662,10 @@ if ($cam_build and  ($ocn_comp =~ /docn|som/)) {
         $fsstdomain_file=$sstdata_file;
         $fsstdomain_path=$sstdata_path;
     }
+    if ($ocn_comp eq 'simplesom') {
+        $fsstdomain_file=$sstdata_file;
+        $fsstdomain_path=$sstdata_path;
+    }
 
     if ($dyn =~ /se/){
       $temp = $bndtvs_domain;
@@ -3677,10 +3681,14 @@ if ($cam_build and  ($ocn_comp =~ /docn|som/)) {
     if ($ocn_comp eq 'som') {
         add_default($nl, 'force_prognostic_true', 'val'=>'.false.');
     }
+    if ($ocn_comp eq 'simplesom') {
+        add_default($nl, 'force_prognostic_true', 'val'=>'.false.');
+    }
 
     my $datamode = 'SSTDATA';
     if ($aqua_mode) { $datamode = "SST_AQUAP$aqua_planet_sst";}
     if ($ocn_comp eq 'som') { $datamode = 'SOM';}
+    if ($ocn_comp eq 'simplesom') { $datamode = 'SIMPLESOM';}
     add_default($nl, 'dataMode', 'val'=>$datamode);
 
     add_default($nl, 'domainFile', 'val'=>$focndomain);
@@ -3702,6 +3710,14 @@ if ($cam_build and  ($ocn_comp =~ /docn|som/)) {
         add_default($nl, 'taxmode',     'val'=>'cycle');
         add_default($nl, 'tintalgo',    'val'=>'linear');
     }
+    elsif ($ocn_comp eq 'simplesom') {
+        add_default($nl, 'fillalgo',    'val'=>'nn');
+        add_default($nl, 'fillmask',    'val'=>'nomask');
+        add_default($nl, 'mapalgo',     'val'=>'bilinear');
+        add_default($nl, 'mapmask',     'val'=>'dstmask');
+        add_default($nl, 'taxmode',     'val'=>'cycle');
+        add_default($nl, 'tintalgo',    'val'=>'linear');
+    }
 
     # Create docn.stream.txt
     # ----------------------
@@ -3711,6 +3727,7 @@ if ($cam_build and  ($ocn_comp =~ /docn|som/)) {
 
         my $datasource = 'DATASET';
         if ($ocn_comp eq 'som') { $datasource = 'GENERIC';}
+        if ($ocn_comp eq 'simplesom') { $datasource = 'GENERIC';}
 
 
         print $fh  <<"EOF";
@@ -3753,6 +3770,33 @@ EOF
 EOF
         }
         elsif ($ocn_comp eq 'som') {
+            print $fh  <<"EOF";
+      <fieldInfo>
+         <variableNames>
+            T     t
+            S     s
+            U     u
+            V     v
+            dhdx  dhdx
+            dhdy  dhdy
+            hblt  h
+            qdp   qbot
+         </variableNames>
+         <filePath>
+            $sstdata_path
+         </filePath>
+         <fileNames>
+            $sstdata_file
+         </fileNames>
+         <offset>
+            0
+         </offset>
+      </fieldInfo>
+</stream>
+</streamstemplate>
+EOF
+        }
+        elsif ($ocn_comp eq 'simplesom') {
             print $fh  <<"EOF";
       <fieldInfo>
          <variableNames>
@@ -3866,6 +3910,10 @@ if ($ocn_comp eq 'dom') {
     $outfile = "$opts{'dir'}/ocn_in";
 }
 elsif ($ocn_comp eq 'docn' or $ocn_comp eq 'som') {
+    @comp_groups = qw(docn_nml shr_strdata_nml);
+    $outfile = "$opts{'dir'}/docn_in";
+}
+elsif ($ocn_comp eq 'docn' or $ocn_comp eq 'simplesom') {
     @comp_groups = qw(docn_nml shr_strdata_nml);
     $outfile = "$opts{'dir'}/docn_in";
 }

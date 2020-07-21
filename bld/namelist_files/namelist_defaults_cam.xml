@@ -235,6 +235,7 @@
 <analytic_ic_type phys="held_suarez"> held_suarez_1994 </analytic_ic_type>
 <analytic_ic_type phys="kessler"    > moist_baroclinic_wave_dcmip2016 </analytic_ic_type>
 <analytic_ic_type phys="tj2016"     > moist_baroclinic_wave_dcmip2016 </analytic_ic_type>
+<analytic_ic_type phys="frierson"   > moist_baroclinic_wave_dcmip2016 </analytic_ic_type>
 
 <!-- Bulk aerosol physical properties (includes optics) -->
 
@@ -1818,6 +1819,7 @@
 <se_qsize_condensate_loading phys="adiabatic"   > 1 </se_qsize_condensate_loading>
 <se_qsize_condensate_loading phys="kessler"     > 1 </se_qsize_condensate_loading>
 <se_qsize_condensate_loading phys="tj2016"      > 1 </se_qsize_condensate_loading>
+<se_qsize_condensate_loading phys="frierson"    > 1 </se_qsize_condensate_loading>
 
 <se_qsplit > 1 </se_qsplit>
 
@@ -1969,5 +1971,6 @@
 <focndomain hgrid="ne240np4"  >share/domains/domain.ocn.ne240np4_gx1v6.111226.nc</focndomain>
 
 <focndomain hgrid="1.9x2.5" ocn="som">atm/cam/ocnfrac/domain.aqua.fv1.9x2.5.nc</focndomain>
+<focndomain hgrid="0.9x1.25" ocn="simplesom">/glade/work/patc/For_Isla/Models/som/domain.som.0.9x1.25.nc</focndomain>
 
 </namelist_defaults>

@@ -255,7 +255,6 @@
       <value compset="CAM%HS94"          >held_suarez_1994</value>
       <value compset="CAM%TJ16"          >dctest_tj2016</value>
       <value compset="CAM%KESSLER"       >dctest_baro_kessler</value>
-      <value compset="CAM%FRIERSON"      >dctest_frierson</value>
 
       <!-- SCAM defaults to ARM97, all other IOPs are in usermods_dirs -->
       <value compset="CAM[456]0%SCAM"    >scam_arm97</value>

@@ -6,7 +6,6 @@
 !===============================================================
 ! TUNING Parameters for Frierson Simple Model
 !===============================================================
-&frierson_nl
   frierson_T0         = 273.16      ! Reference Temperatue
   frierson_E0         = 610.78      ! Saturation Vapor pressure at T0
   frierson_WetDryCoef = 1.          ! E0 Adjustment coef for wet/dry expts.
@@ -26,5 +25,21 @@
   frierson_Tmin       = 271.        ! Initial surface temp at poles.
   frierson_Tdlt       = 39.         ! Initial Ts change in temp from pole to equator
   frierson_Twidth     = 26.         ! Initial Ts equatorial width 
+
+  aqua_planet         = .false.
+
+! Force PHIS to be set to zero 
+  use_topo_file       = .false.
+
+! history output customization
+  empty_htapes        = .true.
+  nhtfrq              = -720
+  avgflag_pertape     = 'A'
+
+  fincl1 = 'PS','Q','T','U','V','OMEGA','U850','V850','T850','OMEGA850','Q850','PRECL','SHFLX','LHFLX','TAUX','TAUY','SST', 'DCQ','DTCOND','QRS','RELHUM','QFLX','PTTEND','PTEQ','VT','UU','VV','VU'
+
+  analytic_ic_type    = 'moist_baroclinic_wave_dcmip2016'
+
+  test_tracer_names   =  'TT_SLOT','TT_GBALL','TT_TANH','TT_EM8','TT_Y2_2','TT_Y32_16'
 /
  

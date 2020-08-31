@@ -122,27 +122,29 @@ module frierson_cam
   real(r8),allocatable:: clat  (:,:)     ! latitudes(radians) for columns
   real(r8),allocatable:: Fnet  (:,:)     ! Net Radiative Surface Heating
 
+  real(r8), parameter :: unset_r8 = huge(1.0_r8)
+
   ! Global Tuning values
   !------------------------
-  real(r8):: frierson_T0         = 273.16_r8
-  real(r8):: frierson_E0         = 610.78_r8
-  real(r8):: frierson_Erad       = 6.376d6
-  real(r8):: frierson_Wind_min   = 1.0d-5
-  real(r8):: frierson_Z0         = 3.21d-5
-  real(r8):: frierson_Ri_c       = 1.0_r8
-  real(r8):: frierson_Karman     = 0.4_r8
-  real(r8):: frierson_Fb         = 0.1_r8
-  real(r8):: frierson_Rs0        = 938.4_r8
-  real(r8):: frierson_DeltaS     = 1.4_r8
-  real(r8):: frierson_Tau_eqtr   = 6.0_r8
-  real(r8):: frierson_Tau_pole   = 1.5_r8
-  real(r8):: frierson_LinFrac    = 0.1_r8
-  real(r8):: frierson_Boltz      = 5.6734d-8
-  real(r8):: frierson_C0         = 1.e7_R8
-  real(r8):: frierson_Tmin       = 271._R8
-  real(r8):: frierson_Tdlt       = 39._R8
-  real(r8):: frierson_Twidth     = 26._R8
-  real(r8):: frierson_WetDryCoef = 1._R8
+  real(r8):: frierson_T0         = unset_r8
+  real(r8):: frierson_E0         = unset_r8
+  real(r8):: frierson_Erad       = unset_r8
+  real(r8):: frierson_Wind_min   = unset_r8
+  real(r8):: frierson_Z0         = unset_r8
+  real(r8):: frierson_Ri_c       = unset_r8
+  real(r8):: frierson_Karman     = unset_r8
+  real(r8):: frierson_Fb         = unset_r8
+  real(r8):: frierson_Rs0        = unset_r8
+  real(r8):: frierson_DeltaS     = unset_r8
+  real(r8):: frierson_Tau_eqtr   = unset_r8
+  real(r8):: frierson_Tau_pole   = unset_r8
+  real(r8):: frierson_LinFrac    = unset_r8
+  real(r8):: frierson_Boltz      = unset_r8
+  real(r8):: frierson_C0         = unset_r8
+  real(r8):: frierson_Tmin       = unset_r8
+  real(r8):: frierson_Tdlt       = unset_r8
+  real(r8):: frierson_Twidth     = unset_r8
+  real(r8):: frierson_WetDryCoef = unset_r8
 
   ! Global values stored for upward sweep
   !----------------------------------------

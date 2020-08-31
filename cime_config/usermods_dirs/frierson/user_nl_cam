@@ -1,31 +1,5 @@
 ! Users should add all user specific namelist changes below in the form of 
 ! namelist_var = new_namelist_value 
-
-
-
-!===============================================================
-! TUNING Parameters for Frierson Simple Model
-!===============================================================
-  frierson_T0         = 273.16      ! Reference Temperatue
-  frierson_E0         = 610.78      ! Saturation Vapor pressure at T0
-  frierson_WetDryCoef = 1.          ! E0 Adjustment coef for wet/dry expts.
-  frierson_Erad       = 6.376d6     ! Earth Radius
-  frierson_Wind_min   = 1.0d-5      ! Min wind speed to prevent division by 0.
-  frierson_Z0         = 3.21d-5     ! Roughness Length
-  frierson_Ri_c       = 1.0         ! Critical Richardson number - stable mixing cutoff
-  frierson_Karman     = 0.4         ! von Karman constant
-  frierson_Fb         = 0.1         ! Surface Layer Fraction
-  frierson_Rs0        = 938.4       ! Net Solar constant (includes albedo)
-  frierson_DeltaS     = 1.4         ! Latitudinal variation of shortwave radiation
-  frierson_Tau_eqtr   = 6.0         ! Longwave optical depth at equator
-  frierson_Tau_pole   = 1.5         ! Longwave optical depth at poles
-  frierson_LinFrac    = 0.1         ! Linear optical depth parameter for tau
-  frierson_Boltz      = 5.6734d-8   ! Stefan-Boltzman constant
-  frierson_C0         = 1.e7        ! Ocean mixed layer heat capacity
-  frierson_Tmin       = 271.        ! Initial surface temp at poles.
-  frierson_Tdlt       = 39.         ! Initial Ts change in temp from pole to equator
-  frierson_Twidth     = 26.         ! Initial Ts equatorial width 
-
   aqua_planet         = .false.
 
 ! Force PHIS to be set to zero 

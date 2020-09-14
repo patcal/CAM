@@ -623,7 +623,7 @@ contains
     !
     ! Passed Variables
     !------------------
-    type(physics_state)      ,intent(inout):: state
+    type(physics_state)      ,intent(in)   :: state
     real(r8)                 ,intent(in)   :: ztodt 
     type(physics_ptend)      ,intent(out)  :: ptend 
     type(physics_buffer_desc),pointer      :: pbuf(:)

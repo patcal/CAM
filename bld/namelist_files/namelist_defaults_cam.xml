@@ -238,6 +238,7 @@
 <analytic_ic_type phys="frierson"   > moist_baroclinic_wave_dcmip2016 </analytic_ic_type>
 
 <!-- Frierson Grey Radiation -->
+<!--  CACQUESTION: A GOOD NUMBER OF THESE VALUES COULD COME FROM cime/src/share/util/shr_const_mod.F90 -->
 
 <frierson_T0         phys="frierson"   > 273.16    </frierson_T0>
 <frierson_E0         phys="frierson"   > 610.78    </frierson_E0>

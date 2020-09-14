@@ -55,6 +55,7 @@
                                                                         -->
 
 <!-- Frierson Simple Physics Parameters -->
+<!-- CACQUESTION -- Descriptions need to be more explicit for the parameters -->
 
 <entry id="frierson_T0" type="real" category="frierson"
        group="frierson_nl" valid_values="" >

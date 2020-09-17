@@ -1,19 +1,11 @@
 ! Users should add all user specific namelist changes below in the form of 
-! namelist_var = new_namelist_value 
-  aqua_planet         = .false.
 
-! Force PHIS to be set to zero 
-  use_topo_file       = .false.
-
+!CACQUESTION  Are these really settings EVERY Frierson runs will use?  If so there may be better ways to set them up.
 ! history output customization
   empty_htapes        = .true.
   nhtfrq              = -720
   avgflag_pertape     = 'A'
 
   fincl1 = 'PS','Q','T','U','V','OMEGA','U850','V850','T850','OMEGA850','Q850','PRECL','SHFLX','LHFLX','TAUX','TAUY','SST', 'DCQ','DTCOND','QRS','RELHUM','QFLX','PTTEND','PTEQ','VT','UU','VV','VU'
-
-  analytic_ic_type    = 'moist_baroclinic_wave_dcmip2016'
-
-  test_tracer_names   =  'TT_SLOT','TT_GBALL','TT_TANH','TT_EM8','TT_Y2_2','TT_Y32_16'
 /
  

@@ -45,7 +45,6 @@ module frierson_cam
   public :: frierson_register
   public :: frierson_readnl
   public :: frierson_init
-!  public :: frierson_timestep_init
   public :: frierson_convection_tend
   public :: frierson_condensate_tend
   public :: frierson_pbl_init
@@ -53,6 +52,7 @@ module frierson_cam
   public :: frierson_radiative_tend
   private:: frierson_surface_init
 
+  ! CACQUESTION - The definition of each of these needs to appear here or somewhere
   ! PBL Configuatons
   !------------------
   integer,parameter:: FRIERSON_IMPL_DIAG          = 1
@@ -64,6 +64,7 @@ module frierson_cam
   integer,parameter:: FRIERSON_EXPSFC_CONFIG2     = 7
   integer,parameter:: FRIERSON_EXPSFC             = 8
 
+  ! CACQUESTION - The definition of each of these needs to appear here or somewhere
   ! Tags to identify optional model formulations
   !------------------------------------------------
   integer,parameter:: CONVECTION_NONE          = 0
@@ -76,6 +77,7 @@ module frierson_cam
   integer,parameter:: SURFACE_UPDATE_NONE      = 0
   integer,parameter:: SURFACE_UPDATE_FRIERSON  = 1
 
+  ! CACQUESTION - These need to become Frierson namelist variables
   ! Options selecting which PRECIP, PBL, RADIATION, and SURFACE formulations to use.
   !---------------------------------------------------------------------------------
 !  integer,parameter:: PBL_OPT            = FRIERSON_EXPSFC_CONFIG2 
@@ -270,6 +272,7 @@ contains
       call freeunit(unitn)
     endif
 
+    ! CACQUESTION - Either add checks or remove this comment
     ! Sanity Check namelist values
     !--------------------------------
 
@@ -379,6 +382,8 @@ contains
     call addfld('R_Qsurf ', horiz_only, 'I','kg/kg', 'Surface Water Vapor'      )
     call addfld('R_Cdrag' , horiz_only, 'I','n/a'  , 'Surface Drag'             )
 
+    ! CACQUESTION - There are a number of fields here which are not going to be written out due to the override in usermods_dirs.
+    ! The list here should be the default fields
     call add_default('QRS'  ,1,' ')
     call add_default('KVH'  ,1,' ')
     call add_default('KVM'  ,1,' ')
@@ -667,6 +672,8 @@ contains
                                                        qv(:ncol,:), &
                                                    relhum(:ncol,:), &
                                                   prec_dp(:ncol)    )
+    !CACQUESTION -- Should probably test for this condition and add an else statement which results in an error 
+    ! -- OR -- Make CONVECTION_FRIERSON a logical with only true/false options
     else ! (CONVECTION_OPT.eq.CONVECTION_NONE) then
       call frierson_convection_NONE(ncol,pver,ztodt,state%pmid(:ncol,:), &
                                                     state%pdel(:ncol,:), &
@@ -756,6 +763,7 @@ contains
                                                             qv(:ncol,:), &
                                                         relhum(:ncol,:), &
                                                       prec_pcw(:ncol)    )
+    !CACQUESTION -- Should probably test for this condition and add an else statement which results in an error 
     else ! (CONDENSATE_OPT.eq.CONDENSATE_NONE) then
       call frierson_condensate_NONE(ncol,pver,ztodt,state%pmid(:ncol,:), &
                                                     state%pdel(:ncol,:), &
@@ -837,6 +845,8 @@ contains
        (PBL_OPT.eq.FRIERSON_IMPL_DIAGC  ).or. &
        (PBL_OPT.eq.FRIERSON_EXPSFC_DIAG ).or. &
        (PBL_OPT.eq.FRIERSON_EXPSFC_DIAGC)     ) then
+    ! CACQUESTION - Would a return be better here?  I had to look past all of the other elseif blocks to see that
+    !               for these conditions, nothing is done in this routine.
       continue  ! Nothig to do here
     elseif(PBL_OPT.eq.FRIERSON_IMPL_CONFIG1) then
       Tsfc_bc(:ncol,lchnk) = Tsurf(:ncol,CURR(lchnk),lchnk)
@@ -1120,22 +1130,9 @@ contains
 
     else
 
-      !** ERROR STOP
+      call endrun('frierson_pbl_init: ERROR Invalid PBL_OPT')
 
     endif
- 
-    ! Some values that need to be passed to surface for implicit calc.
-    !----------------------------------------------------------------
-!    cam_out%Cstar(ncol)
-!    cam_out%MU_a (ncol) 
-!    cam_out%Estar_t(ncol)
-!    cam_out%Estar_q(ncol)
-!    cam_out%Estar_u(ncol)
-!    cam_out%Estar_v(ncol)
-!    cam_out%dFa_dTa(ncol)
-!    cam_out%dFa_dQa(ncol)
-!    cam_out%dFa_dUa(ncol)
-!    cam_out%dFa_dVa(ncol)
 
    !=================================================================
    ! Compute values that should be passed back from surface routines:
@@ -1172,23 +1169,7 @@ contains
     !
     ! Local Values
     !----------------
-!    real(r8) :: T         (state%ncol,pver)   ! T temporary
-!    real(r8) :: qv        (state%ncol,pver)   ! Q temporary (specific humidity)
-!    real(r8) :: U         (state%ncol,pver)   ! U temporary
-!    real(r8) :: V         (state%ncol,pver)   ! V temporary
     logical  :: lq        (pcnst)             ! Calc tendencies?
-!    real(r8) :: dqdt_vdiff(state%ncol,pver)   ! PBL Q vertical diffusion tend kg/kg/s
-!    real(r8) :: dtdt_vdiff(state%ncol,pver)   ! PBL T vertical diffusion tend  K/s
-!    real(r8) :: Km        (state%ncol,pver+1) ! Eddy diffusivity at layer interfaces (m2/s)
-!    real(r8) :: Ke        (state%ncol,pver+1) ! Eddy diffusivity at layer interfaces (m2/s)
-!    real(r8) :: VSE       (state%ncol,pver)   ! Dry Static Energy divided by Cp (K)
-!    real(r8) :: Zm        (state%ncol,pver)   ! 
-!    real(r8) :: Zi        (state%ncol,pver)   ! 
-!    real(r8) :: Z_pbl     (state%ncol)        ! 
-!    real(r8) :: Rf        (state%ncol,pver)   ! 
-!    real(r8) :: Tsfc      (state%ncol)        ! Surface T 
-!    real(r8) :: Qsfc      (state%ncol)        ! Surface Q (saturated)
-!    real(r8) :: Cdrag     (state%ncol)        ! Cdrag coef from surface calculation
     real(r8) :: dTs       (state%ncol)   
     real(r8) :: dUa       (state%ncol,pver)   
     real(r8) :: dVa       (state%ncol,pver)   
@@ -1462,8 +1443,6 @@ contains
     elseif(PBL_OPT.eq.FRIERSON_EXPSFC        ) then
       Tsfc  (:ncol)     = cam_in%ts (:ncol)
       Qsfc  (:ncol)     = cam_in%ssq(:ncol)
-!      Tsfc  (:ncol)     = Tsfc_bc(:ncol,lchnk)
-!      Qsfc  (:ncol)     = Qsfc_bc(:ncol,lchnk)
       call frierson_pbl_up_expsfc(ncol, pver, ztodt, Fval_t(:ncol,:,lchnk),  &
                                                      Fval_q(:ncol,:,lchnk),  &
                                                      Fval_u(:ncol,:,lchnk),  &
@@ -1484,7 +1463,7 @@ contains
                                                      dVa   (:ncol,:)         )
 
     else
-      ! ** ERROR STOP
+      call endrun('frierson_pbl_tend: ERROR Invalid PBL_OPT')
     endif
 
 
@@ -1504,17 +1483,6 @@ contains
 
     ! Archive diagnostic fields
     !----------------------------
-!    call outfld('KVH' ,Ke        ,ncol ,lchnk) ! Eddy diffusivity (heat and moisture,m2/s)
-!    call outfld('KVM' ,Km        ,ncol ,lchnk) ! Eddy diffusivity (momentum, m2/s)
-!    call outfld('VSE' ,VSE       ,ncol ,lchnk) ! Virtual Dry Static Energy divided by Cp (K)
-!    call outfld('Zm'  ,Zm        ,ncol ,lchnk) ! 
-!    call outfld('Z_pbl',Z_pbl    ,ncol ,lchnk) ! 
-!    call outfld('Rf'  ,Rf        ,ncol ,lchnk) ! 
-!    call outfld('DUV' ,ptend%u   ,pcols,lchnk) ! PBL u tendency (m/s2)
-!    call outfld('DVV' ,ptend%v   ,pcols,lchnk) ! PBL v tendency (m/s2)
-!    call outfld('DTV' ,dtdt_vdiff,ncol ,lchnk) ! PBL + surface flux T tendency (K/s)
-!    call outfld('VD01',dqdt_vdiff,ncol ,lchnk) ! PBL + surface flux Q tendency (kg/kg/s)
-!    call outfld('Cdrag',Cdrag    ,ncol ,lchnk) ! 
 
     call outfld('R_Tsurf' , Tsurf (:ncol,CURR(lchnk),lchnk),ncol,lchnk)  !DIAG
     call outfld('R_Qsurf' , Qsurf (:ncol,lchnk),ncol,lchnk)              !DIAG

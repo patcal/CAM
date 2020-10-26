@@ -67,9 +67,6 @@ module frierson
 
   ! Values for DIAG routines
   !--------------------------
-  real(r8):: T_min   = 271._r8             ! Minimum sst (K)
-  real(r8):: del_T   = 39._r8  ! 29._r8    ! eq-polar difference sst (K)
-  real(r8):: T_width = 26.0_r8*pi/180.0_r8 ! width parameter for sst (C)
   real(r8):: C_ocn   = 1.d7
 
   ! Private data
@@ -154,9 +151,6 @@ contains
 
     ! Tuning values for DIAGs
     !---------------------------
-    T_min   = 271._r8             ! Minimum sst (K)
-    del_T   = 39._r8  ! 29._r8    ! eq-polar difference sst (K)
-    T_width = 26.0_r8*pi/180.0_r8 ! width parameter for sst (C)
     C_ocn   = 1.d7
 
     ! allocate space and set the level information
@@ -361,7 +355,6 @@ contains
         if(pmid(i,k).gt.(1._r8-epsilo)*esat(i,k)) then
           qsat (i,k) = epsilo*esat(i,k)/pmid(i,k)
           dqsat(i,k) = (latvap/rh2o)*qsat(i,k)/(T(i,k)**2)
-!x        dqsat(i,k) = epsilo*latvap*qsat(i,k)/(rair*T(i,k)**2)
         else
           qsat (i,k) = 0._r8
           dqsat(i,k) = 0._r8
@@ -524,16 +517,6 @@ contains
     !                           of the Frierson model. The calculations are
     !                           roughly divided up into sections of the model 
     !                           where they should be carried out.
-    !
-    !==========================================================================
-    ! Tuning Parameters
-    !--------------------
-    !  real(r8),parameter:: Wind_min = 1.0d-5
-    !  real(r8),parameter:: Z0       = 3.21d-5
-    !  real(r8),parameter:: Ri_c     = 1.0_r8
-    !  real(r8),parameter:: Karman   = 0.4_r8
-    !  real(r8),parameter:: Erad     = 6.376d6
-    !  real(r8),parameter:: Fb       = 0.1_r8
     !
     !==========================================================================
     ! 
@@ -944,8 +927,6 @@ contains
     Flux (:) = (dtime/C_ocn)*(Fdn(:) -     Fup(:) +      Fsw(:)  & 
                                      -cpair*Ft(:) -latvap*Fq(:)  )
     dFlux(:) = (dtime/C_ocn)*(-dFup_dTs(:) -cpair*dFt_dTs(:) -latvap*dFq_dTs(:))
-!XXXX    dTs  (:) = (Flux(:)/(1._r8-dFlux(:)))
-!XXXX    Tsfc(:) = Tsfc(:) + dTs(:)
     Tsfc(:) = Tsfc(:) + (Flux(:)/(1._r8-dFlux(:)))
     Qsfc(:) = epsilo*E0/Psfc(:)*exp(-latvap/rh2o*((1._r8/Tsfc(:))-1._r8/T0))
 
@@ -1009,16 +990,6 @@ contains
     !                           of the Frierson model. The calculations are
     !                           roughly divided up into sections of the model 
     !                           where they should be carried out.
-    !
-    !==========================================================================
-    ! Tuning Parameters
-    !--------------------
-    !  real(r8),parameter:: Wind_min = 1.0d-5
-    !  real(r8),parameter:: Z0       = 3.21d-5
-    !  real(r8),parameter:: Ri_c     = 1.0_r8
-    !  real(r8),parameter:: Karman   = 0.4_r8
-    !  real(r8),parameter:: Erad     = 6.376d6
-    !  real(r8),parameter:: Fb       = 0.1_r8
     !
     !==========================================================================
     ! 
@@ -1356,16 +1327,6 @@ contains
     !                             and FLUX/SOM. This formulation, while not consistent 
     !                             with the orifinal Frierson model, can be accomodated 
     !                             by the coupler. 
-    !
-    !==========================================================================
-    ! Tuning Parameters
-    !--------------------
-    !  real(r8),parameter:: Wind_min = 1.0d-5
-    !  real(r8),parameter:: Z0       = 3.21d-5
-    !  real(r8),parameter:: Ri_c     = 1.0_r8
-    !  real(r8),parameter:: Karman   = 0.4_r8
-    !  real(r8),parameter:: Erad     = 6.376d6
-    !  real(r8),parameter:: Fb       = 0.1_r8
     !
     !==========================================================================
     ! 
@@ -1839,16 +1800,6 @@ contains
     !                             by the coupler. 
     !
     !==========================================================================
-    ! Tuning Parameters
-    !--------------------
-    !  real(r8),parameter:: Wind_min = 1.0d-5
-    !  real(r8),parameter:: Z0       = 3.21d-5
-    !  real(r8),parameter:: Ri_c     = 1.0_r8
-    !  real(r8),parameter:: Karman   = 0.4_r8
-    !  real(r8),parameter:: Erad     = 6.376d6
-    !  real(r8),parameter:: Fb       = 0.1_r8
-    !
-    !==========================================================================
     ! 
     ! Passed Variables
     !------------------
@@ -2183,16 +2134,6 @@ contains
     !            Ws_a (ncol)        ! wind speed at the lowest model level (m/s)
     !            rho_a(ncol)        ! density at the lowest model level (m/s)
     !            Rf   (ncol,pver)   ! Bulk Richardson number
-    !==========================================================================
-    ! Tuning Parameters
-    !--------------------
-    !  real(r8),parameter:: Wind_min = 1.0d-5
-    !  real(r8),parameter:: Z0       = 3.21d-5
-    !  real(r8),parameter:: Ri_c     = 1.0_r8
-    !  real(r8),parameter:: Karman   = 0.4_r8
-    !  real(r8),parameter:: Erad     = 6.376d6
-    !  real(r8),parameter:: Fb       = 0.1_r8
-    !
     !==========================================================================
     ! 
     ! Passed Variables
@@ -3108,17 +3049,6 @@ contains
   subroutine frierson_radiation(ncol,pver,dtime,clat,pint,pmid,  &
                                 Psfc,Tsfc,Qsfc,T,qv,dtdt_rad, &
                                 Fsolar,Fup_s,Fdown_s)
-
-    ! Tuning parameters
-    !---------------------
-    !  real(r8),parameter:: Rs0      = 938.4_r8
-    !  real(r8),parameter:: DeltaS   = 1.4_r8
-    !  real(r8),parameter:: Tau_eqtr = 6.0_r8
-    !  real(r8),parameter:: Tau_pole = 1.5_r8
-    !  real(r8),parameter:: LinFrac  = 0.1_r8
-    !  real(r8),parameter:: Boltz    = 5.6734d-8
-    !
-    !==========================================================================
     !
     ! Passed Variables
     !-------------------

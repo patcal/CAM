@@ -32,9 +32,8 @@ module frierson_cam
   use spmd_utils,     only: masterproc
   use cam_logfile,    only: iulog
   use hycoef,         only: ps0, etamid
-#ifdef SPMD
-  use mpishorthand
-#endif
+  use spmd_utils,     only: mpicom, mstrid=>masterprocid, mpi_logical, mpi_real8
+
 
   ! Set all Global values and routines to private by default
   ! and then explicitly set their exposure. 
@@ -46,7 +45,6 @@ module frierson_cam
   public :: frierson_register
   public :: frierson_readnl
   public :: frierson_init
-!  public :: frierson_timestep_init
   public :: frierson_convection_tend
   public :: frierson_condensate_tend
   public :: frierson_pbl_init
@@ -54,6 +52,7 @@ module frierson_cam
   public :: frierson_radiative_tend
   private:: frierson_surface_init
 
+  ! CACQUESTION - The definition of each of these needs to appear here or somewhere
   ! PBL Configuatons
   !------------------
   integer,parameter:: FRIERSON_IMPL_DIAG          = 1
@@ -65,6 +64,7 @@ module frierson_cam
   integer,parameter:: FRIERSON_EXPSFC_CONFIG2     = 7
   integer,parameter:: FRIERSON_EXPSFC             = 8
 
+  ! CACQUESTION - The definition of each of these needs to appear here or somewhere
   ! Tags to identify optional model formulations
   !------------------------------------------------
   integer,parameter:: CONVECTION_NONE          = 0
@@ -77,6 +77,7 @@ module frierson_cam
   integer,parameter:: SURFACE_UPDATE_NONE      = 0
   integer,parameter:: SURFACE_UPDATE_FRIERSON  = 1
 
+  ! CACQUESTION - These need to become Frierson namelist variables
   ! Options selecting which PRECIP, PBL, RADIATION, and SURFACE formulations to use.
   !---------------------------------------------------------------------------------
 !  integer,parameter:: PBL_OPT            = FRIERSON_EXPSFC_CONFIG2 
@@ -122,27 +123,29 @@ module frierson_cam
   real(r8),allocatable:: clat  (:,:)     ! latitudes(radians) for columns
   real(r8),allocatable:: Fnet  (:,:)     ! Net Radiative Surface Heating
 
+  real(r8), parameter :: unset_r8 = huge(1.0_r8)
+
   ! Global Tuning values
   !------------------------
-  real(r8):: frierson_T0         = 273.16_r8
-  real(r8):: frierson_E0         = 610.78_r8
-  real(r8):: frierson_Erad       = 6.376d6
-  real(r8):: frierson_Wind_min   = 1.0d-5
-  real(r8):: frierson_Z0         = 3.21d-5
-  real(r8):: frierson_Ri_c       = 1.0_r8
-  real(r8):: frierson_Karman     = 0.4_r8
-  real(r8):: frierson_Fb         = 0.1_r8
-  real(r8):: frierson_Rs0        = 938.4_r8
-  real(r8):: frierson_DeltaS     = 1.4_r8
-  real(r8):: frierson_Tau_eqtr   = 6.0_r8
-  real(r8):: frierson_Tau_pole   = 1.5_r8
-  real(r8):: frierson_LinFrac    = 0.1_r8
-  real(r8):: frierson_Boltz      = 5.6734d-8
-  real(r8):: frierson_C0         = 1.e7_R8
-  real(r8):: frierson_Tmin       = 271._R8
-  real(r8):: frierson_Tdlt       = 39._R8
-  real(r8):: frierson_Twidth     = 26._R8
-  real(r8):: frierson_WetDryCoef = 1._R8
+  real(r8):: frierson_T0
+  real(r8):: frierson_E0
+  real(r8):: frierson_Erad
+  real(r8):: frierson_Wind_min
+  real(r8):: frierson_Z0
+  real(r8):: frierson_Ri_c
+  real(r8):: frierson_Karman
+  real(r8):: frierson_Fb
+  real(r8):: frierson_Rs0
+  real(r8):: frierson_DeltaS
+  real(r8):: frierson_Tau_eqtr
+  real(r8):: frierson_Tau_pole
+  real(r8):: frierson_LinFrac
+  real(r8):: frierson_Boltz
+  real(r8):: frierson_C0
+  real(r8):: frierson_Tmin
+  real(r8):: frierson_Tdlt
+  real(r8):: frierson_Twidth
+  real(r8):: frierson_WetDryCoef
 
   ! Global values stored for upward sweep
   !----------------------------------------
@@ -223,6 +226,8 @@ contains
     !--------------
     integer:: ierr,unitn
 
+    character(len=*), parameter :: sub = 'frierson_readnl'
+
     namelist /frierson_nl/ frierson_T0 , frierson_E0    , frierson_Erad    , frierson_Wind_min, &
                            frierson_Z0 , frierson_Ri_c  , frierson_Karman  , frierson_Fb      , &
                            frierson_Rs0, frierson_DeltaS, frierson_Tau_eqtr, frierson_Tau_pole, &
@@ -231,25 +236,25 @@ contains
 
     ! Set default namelist values
     !-----------------------------
-    frierson_T0         = 273.16_r8
-    frierson_E0         = 610.78_r8
-    frierson_Erad       = 6.376d6
-    frierson_Wind_min   = 1.0d-5
-    frierson_Z0         = 3.21d-5
-    frierson_Ri_c       = 1.0_r8
-    frierson_Karman     = 0.4_r8
-    frierson_Fb         = 0.1_r8
-    frierson_Rs0        = 938.4_r8
-    frierson_DeltaS     = 1.4_r8
-    frierson_Tau_eqtr   = 6.0_r8
-    frierson_Tau_pole   = 1.5_r8
-    frierson_LinFrac    = 0.1_r8
-    frierson_Boltz      = 5.6734d-8
-    frierson_C0         = 1.e7_R8
-    frierson_Tmin       = 271._R8
-    frierson_Tdlt       = 39._R8
-    frierson_Twidth     = 26._R8
-    frierson_WetDryCoef = 1._R8
+    frierson_T0         = unset_r8
+    frierson_E0         = unset_r8
+    frierson_Erad       = unset_r8
+    frierson_Wind_min   = unset_r8
+    frierson_Z0         = unset_r8
+    frierson_Ri_c       = unset_r8
+    frierson_Karman     = unset_r8
+    frierson_Fb         = unset_r8
+    frierson_Rs0        = unset_r8
+    frierson_DeltaS     = unset_r8
+    frierson_Tau_eqtr   = unset_r8
+    frierson_Tau_pole   = unset_r8
+    frierson_LinFrac    = unset_r8
+    frierson_Boltz      = unset_r8
+    frierson_C0         = unset_r8
+    frierson_Tmin       = unset_r8
+    frierson_Tdlt       = unset_r8
+    frierson_Twidth     = unset_r8
+    frierson_WetDryCoef = unset_r8
 
     ! Read in namelist values
     !-------------------------
@@ -267,34 +272,51 @@ contains
       call freeunit(unitn)
     endif
 
+    ! CACQUESTION - Either add checks or remove this comment
     ! Sanity Check namelist values
     !--------------------------------
 
 
     ! Broadcast namelist values
     !---------------------------
-#ifdef SPMD
-    call mpibcast(frierson_T0        , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_E0        , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Erad      , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Wind_min  , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Z0        , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Ri_c      , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Karman    , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Fb        , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Rs0       , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_DeltaS    , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Tau_eqtr  , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Tau_pole  , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_LinFrac   , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Boltz     , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_C0        , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Tmin      , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Tdlt      , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_Twidth    , 1, mpir8 , 0, mpicom)
-    call mpibcast(frierson_WetDryCoef, 1, mpir8 , 0, mpicom)
-
-#endif
+    call mpi_bcast(frierson_T0        , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_T0")
+    call mpi_bcast(frierson_E0        , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_E0")
+    call mpi_bcast(frierson_Erad      , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Erad")
+    call mpi_bcast(frierson_Wind_min  , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Wind_min")
+    call mpi_bcast(frierson_Z0        , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Z0")
+    call mpi_bcast(frierson_Ri_c      , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Ri_c")
+    call mpi_bcast(frierson_Karman    , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Karman")
+    call mpi_bcast(frierson_Fb        , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Fb")
+    call mpi_bcast(frierson_Rs0       , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Rs0")
+    call mpi_bcast(frierson_DeltaS    , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_DeltaS")
+    call mpi_bcast(frierson_Tau_eqtr  , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Tau_eqtr")
+    call mpi_bcast(frierson_Tau_pole  , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Tau_pole")
+    call mpi_bcast(frierson_LinFrac   , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_LinFrac")
+    call mpi_bcast(frierson_Boltz     , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Boltz")
+    call mpi_bcast(frierson_C0        , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_C0")
+    call mpi_bcast(frierson_Tmin      , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Tmin")
+    call mpi_bcast(frierson_Tdlt      , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Tdlt")
+    call mpi_bcast(frierson_Twidth    , 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_Twidth")
+    call mpi_bcast(frierson_WetDryCoef, 1, mpi_real8 , mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: frierson_WetDryCoef")
 
     ! End Routine
     !-------------
@@ -360,6 +382,8 @@ contains
     call addfld('R_Qsurf ', horiz_only, 'I','kg/kg', 'Surface Water Vapor'      )
     call addfld('R_Cdrag' , horiz_only, 'I','n/a'  , 'Surface Drag'             )
 
+    ! CACQUESTION - There are a number of fields here which are not going to be written out due to the override in usermods_dirs.
+    ! The list here should be the default fields
     call add_default('QRS'  ,1,' ')
     call add_default('KVH'  ,1,' ')
     call add_default('KVM'  ,1,' ')
@@ -520,6 +544,10 @@ contains
                                phys_state(lchnk)%ps(:ncol),                   &
                                               Tsurf(:ncol,LAST(lchnk),lchnk), &
                                               Qsurf(:ncol,lchnk)              )
+! CACQUESTION: Does LAST, CURR, NEXT actually do anything?  
+!              I don't see where LAST is used except in the assignment below.
+!              NEXT appears to never be used
+!              Propose deleting this dimension entirely
       Tsurf(:,CURR(lchnk),lchnk) = Tsurf(:,LAST(lchnk),lchnk)
       Tsurf(:,NEXT(lchnk),lchnk) = Tsurf(:,LAST(lchnk),lchnk)
     end do
@@ -542,41 +570,43 @@ contains
 
     ! Informational Output
     !----------------------
-    write(iulog,*) ' '
-    write(iulog,*) '-----------------------------------------------------------'
-    write(iulog,*) '  FRIERSON MODULE INITIALIZED WITH THE FOLLOWING SETTINGS: '
-    write(iulog,*) '-----------------------------------------------------------'
-    write(iulog,*) 'FRIERSON: gravit='    , gravit
-    write(iulog,*) 'FRIERSON: cappa='     , cappa
-    write(iulog,*) 'FRIERSON: rair ='     , rair
-    write(iulog,*) 'FRIERSON: cpair='     , cpair
-    write(iulog,*) 'FRIERSON: latvap='    , latvap
-    write(iulog,*) 'FRIERSON: rh2o='      , rh2o
-    write(iulog,*) 'FRIERSON: epsilo='    , epsilo
-    write(iulog,*) 'FRIERSON: rhoh2o='    , rhoh2o
-    write(iulog,*) 'FRIERSON: zvir='      , zvir
-    write(iulog,*) 'FRIERSON: ps0='       , ps0
-    write(iulog,*) 'FRIERSON: etamid='    , etamid
-    write(iulog,*) 'FRIERSON: T0='        , frierson_T0
-    write(iulog,*) 'FRIERSON: E0='        , frierson_E0
-    write(iulog,*) 'FRIERSON: Erad='      , frierson_Erad
-    write(iulog,*) 'FRIERSON: Wind_min='  , frierson_Wind_min
-    write(iulog,*) 'FRIERSON: Z0='        , frierson_Z0
-    write(iulog,*) 'FRIERSON: Ri_c='      , frierson_Ri_c
-    write(iulog,*) 'FRIERSON: Karman='    , frierson_Karman
-    write(iulog,*) 'FRIERSON: Fb='        , frierson_Fb
-    write(iulog,*) 'FRIERSON: Rs0='       , frierson_Rs0
-    write(iulog,*) 'FRIERSON: DeltaS='    , frierson_DeltaS
-    write(iulog,*) 'FRIERSON: Tau_eqtr='  , frierson_Tau_eqtr
-    write(iulog,*) 'FRIERSON: Tau_pole='  , frierson_Tau_pole
-    write(iulog,*) 'FRIERSON: LinFrac='   , frierson_LinFrac
-    write(iulog,*) 'FRIERSON: Boltz='     , frierson_Boltz
-    write(iulog,*) 'FRIERSON: C0='        , frierson_C0
-    write(iulog,*) 'FRIERSON: Tmin='      , frierson_Tmin
-    write(iulog,*) 'FRIERSON: Tdlt='      , frierson_Tdlt
-    write(iulog,*) 'FRIERSON: Twidth='    , frierson_Twidth
-    write(iulog,*) 'FRIERSON: WetDryCoef=', frierson_WetDryCoef
-    write(iulog,*) ' '
+    if (masterproc) then
+       write(iulog,*) ' '
+       write(iulog,*) '-----------------------------------------------------------'
+       write(iulog,*) '  FRIERSON MODULE INITIALIZED WITH THE FOLLOWING SETTINGS: '
+       write(iulog,*) '-----------------------------------------------------------'
+       write(iulog,*) 'FRIERSON: gravit='    , gravit
+       write(iulog,*) 'FRIERSON: cappa='     , cappa
+       write(iulog,*) 'FRIERSON: rair ='     , rair
+       write(iulog,*) 'FRIERSON: cpair='     , cpair
+       write(iulog,*) 'FRIERSON: latvap='    , latvap
+       write(iulog,*) 'FRIERSON: rh2o='      , rh2o
+       write(iulog,*) 'FRIERSON: epsilo='    , epsilo
+       write(iulog,*) 'FRIERSON: rhoh2o='    , rhoh2o
+       write(iulog,*) 'FRIERSON: zvir='      , zvir
+       write(iulog,*) 'FRIERSON: ps0='       , ps0
+       write(iulog,*) 'FRIERSON: etamid='    , etamid
+       write(iulog,*) 'FRIERSON: T0='        , frierson_T0
+       write(iulog,*) 'FRIERSON: E0='        , frierson_E0
+       write(iulog,*) 'FRIERSON: Erad='      , frierson_Erad
+       write(iulog,*) 'FRIERSON: Wind_min='  , frierson_Wind_min
+       write(iulog,*) 'FRIERSON: Z0='        , frierson_Z0
+       write(iulog,*) 'FRIERSON: Ri_c='      , frierson_Ri_c
+       write(iulog,*) 'FRIERSON: Karman='    , frierson_Karman
+       write(iulog,*) 'FRIERSON: Fb='        , frierson_Fb
+       write(iulog,*) 'FRIERSON: Rs0='       , frierson_Rs0
+       write(iulog,*) 'FRIERSON: DeltaS='    , frierson_DeltaS
+       write(iulog,*) 'FRIERSON: Tau_eqtr='  , frierson_Tau_eqtr
+       write(iulog,*) 'FRIERSON: Tau_pole='  , frierson_Tau_pole
+       write(iulog,*) 'FRIERSON: LinFrac='   , frierson_LinFrac
+       write(iulog,*) 'FRIERSON: Boltz='     , frierson_Boltz
+       write(iulog,*) 'FRIERSON: C0='        , frierson_C0
+       write(iulog,*) 'FRIERSON: Tmin='      , frierson_Tmin
+       write(iulog,*) 'FRIERSON: Tdlt='      , frierson_Tdlt
+       write(iulog,*) 'FRIERSON: Twidth='    , frierson_Twidth
+       write(iulog,*) 'FRIERSON: WetDryCoef=', frierson_WetDryCoef
+       write(iulog,*) ' '
+    end if
 
     ! End Routine
     !--------------
@@ -598,7 +628,7 @@ contains
     !
     ! Passed Variables
     !------------------
-    type(physics_state)      ,intent(inout):: state
+    type(physics_state)      ,intent(in)   :: state
     real(r8)                 ,intent(in)   :: ztodt 
     type(physics_ptend)      ,intent(out)  :: ptend 
     type(physics_buffer_desc),pointer      :: pbuf(:)
@@ -642,6 +672,8 @@ contains
                                                        qv(:ncol,:), &
                                                    relhum(:ncol,:), &
                                                   prec_dp(:ncol)    )
+    !CACQUESTION -- Should probably test for this condition and add an else statement which results in an error 
+    ! -- OR -- Make CONVECTION_FRIERSON a logical with only true/false options
     else ! (CONVECTION_OPT.eq.CONVECTION_NONE) then
       call frierson_convection_NONE(ncol,pver,ztodt,state%pmid(:ncol,:), &
                                                     state%pdel(:ncol,:), &
@@ -731,6 +763,7 @@ contains
                                                             qv(:ncol,:), &
                                                         relhum(:ncol,:), &
                                                       prec_pcw(:ncol)    )
+    !CACQUESTION -- Should probably test for this condition and add an else statement which results in an error 
     else ! (CONDENSATE_OPT.eq.CONDENSATE_NONE) then
       call frierson_condensate_NONE(ncol,pver,ztodt,state%pmid(:ncol,:), &
                                                     state%pdel(:ncol,:), &
@@ -812,6 +845,8 @@ contains
        (PBL_OPT.eq.FRIERSON_IMPL_DIAGC  ).or. &
        (PBL_OPT.eq.FRIERSON_EXPSFC_DIAG ).or. &
        (PBL_OPT.eq.FRIERSON_EXPSFC_DIAGC)     ) then
+    ! CACQUESTION - Would a return be better here?  I had to look past all of the other elseif blocks to see that
+    !               for these conditions, nothing is done in this routine.
       continue  ! Nothig to do here
     elseif(PBL_OPT.eq.FRIERSON_IMPL_CONFIG1) then
       Tsfc_bc(:ncol,lchnk) = Tsurf(:ncol,CURR(lchnk),lchnk)
@@ -1095,22 +1130,9 @@ contains
 
     else
 
-      !** ERROR STOP
+      call endrun('frierson_pbl_init: ERROR Invalid PBL_OPT')
 
     endif
- 
-    ! Some values that need to be passed to surface for implicit calc.
-    !----------------------------------------------------------------
-!    cam_out%Cstar(ncol)
-!    cam_out%MU_a (ncol) 
-!    cam_out%Estar_t(ncol)
-!    cam_out%Estar_q(ncol)
-!    cam_out%Estar_u(ncol)
-!    cam_out%Estar_v(ncol)
-!    cam_out%dFa_dTa(ncol)
-!    cam_out%dFa_dQa(ncol)
-!    cam_out%dFa_dUa(ncol)
-!    cam_out%dFa_dVa(ncol)
 
    !=================================================================
    ! Compute values that should be passed back from surface routines:
@@ -1147,23 +1169,7 @@ contains
     !
     ! Local Values
     !----------------
-!    real(r8) :: T         (state%ncol,pver)   ! T temporary
-!    real(r8) :: qv        (state%ncol,pver)   ! Q temporary (specific humidity)
-!    real(r8) :: U         (state%ncol,pver)   ! U temporary
-!    real(r8) :: V         (state%ncol,pver)   ! V temporary
     logical  :: lq        (pcnst)             ! Calc tendencies?
-!    real(r8) :: dqdt_vdiff(state%ncol,pver)   ! PBL Q vertical diffusion tend kg/kg/s
-!    real(r8) :: dtdt_vdiff(state%ncol,pver)   ! PBL T vertical diffusion tend  K/s
-!    real(r8) :: Km        (state%ncol,pver+1) ! Eddy diffusivity at layer interfaces (m2/s)
-!    real(r8) :: Ke        (state%ncol,pver+1) ! Eddy diffusivity at layer interfaces (m2/s)
-!    real(r8) :: VSE       (state%ncol,pver)   ! Dry Static Energy divided by Cp (K)
-!    real(r8) :: Zm        (state%ncol,pver)   ! 
-!    real(r8) :: Zi        (state%ncol,pver)   ! 
-!    real(r8) :: Z_pbl     (state%ncol)        ! 
-!    real(r8) :: Rf        (state%ncol,pver)   ! 
-!    real(r8) :: Tsfc      (state%ncol)        ! Surface T 
-!    real(r8) :: Qsfc      (state%ncol)        ! Surface Q (saturated)
-!    real(r8) :: Cdrag     (state%ncol)        ! Cdrag coef from surface calculation
     real(r8) :: dTs       (state%ncol)   
     real(r8) :: dUa       (state%ncol,pver)   
     real(r8) :: dVa       (state%ncol,pver)   
@@ -1437,8 +1443,6 @@ contains
     elseif(PBL_OPT.eq.FRIERSON_EXPSFC        ) then
       Tsfc  (:ncol)     = cam_in%ts (:ncol)
       Qsfc  (:ncol)     = cam_in%ssq(:ncol)
-!      Tsfc  (:ncol)     = Tsfc_bc(:ncol,lchnk)
-!      Qsfc  (:ncol)     = Qsfc_bc(:ncol,lchnk)
       call frierson_pbl_up_expsfc(ncol, pver, ztodt, Fval_t(:ncol,:,lchnk),  &
                                                      Fval_q(:ncol,:,lchnk),  &
                                                      Fval_u(:ncol,:,lchnk),  &
@@ -1459,7 +1463,7 @@ contains
                                                      dVa   (:ncol,:)         )
 
     else
-      ! ** ERROR STOP
+      call endrun('frierson_pbl_tend: ERROR Invalid PBL_OPT')
     endif
 
 
@@ -1479,17 +1483,6 @@ contains
 
     ! Archive diagnostic fields
     !----------------------------
-!    call outfld('KVH' ,Ke        ,ncol ,lchnk) ! Eddy diffusivity (heat and moisture,m2/s)
-!    call outfld('KVM' ,Km        ,ncol ,lchnk) ! Eddy diffusivity (momentum, m2/s)
-!    call outfld('VSE' ,VSE       ,ncol ,lchnk) ! Virtual Dry Static Energy divided by Cp (K)
-!    call outfld('Zm'  ,Zm        ,ncol ,lchnk) ! 
-!    call outfld('Z_pbl',Z_pbl    ,ncol ,lchnk) ! 
-!    call outfld('Rf'  ,Rf        ,ncol ,lchnk) ! 
-!    call outfld('DUV' ,ptend%u   ,pcols,lchnk) ! PBL u tendency (m/s2)
-!    call outfld('DVV' ,ptend%v   ,pcols,lchnk) ! PBL v tendency (m/s2)
-!    call outfld('DTV' ,dtdt_vdiff,ncol ,lchnk) ! PBL + surface flux T tendency (K/s)
-!    call outfld('VD01',dqdt_vdiff,ncol ,lchnk) ! PBL + surface flux Q tendency (kg/kg/s)
-!    call outfld('Cdrag',Cdrag    ,ncol ,lchnk) ! 
 
     call outfld('R_Tsurf' , Tsurf (:ncol,CURR(lchnk),lchnk),ncol,lchnk)  !DIAG
     call outfld('R_Qsurf' , Qsurf (:ncol,lchnk),ncol,lchnk)              !DIAG

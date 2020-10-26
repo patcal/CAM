@@ -578,6 +578,30 @@ if ($phys_mode_flags > 1) {
     die "$ProgName - ERROR: Only one of the variables atm_adiabatic, atm_ideal_phys, and aqua_planet can be set .true. \n";
 }
 
+# Set Frierson namelists
+
+if ( $phys eq 'frierson' ) {
+    add_default($nl, 'frierson_T0');
+    add_default($nl, 'frierson_E0');
+    add_default($nl, 'frierson_Erad');
+    add_default($nl, 'frierson_Wind_min');
+    add_default($nl, 'frierson_Z0');
+    add_default($nl, 'frierson_Ri_c');
+    add_default($nl, 'frierson_Karman');
+    add_default($nl, 'frierson_Fb');
+    add_default($nl, 'frierson_Rs0');
+    add_default($nl, 'frierson_DeltaS');
+    add_default($nl, 'frierson_Tau_eqtr');
+    add_default($nl, 'frierson_Tau_pole');
+    add_default($nl, 'frierson_LinFrac');
+    add_default($nl, 'frierson_Boltz');
+    add_default($nl, 'frierson_C0');
+    add_default($nl, 'frierson_Tmin');
+    add_default($nl, 'frierson_Tdlt');
+    add_default($nl, 'frierson_Twidth');
+    add_default($nl, 'frierson_WetDryCoef');
+}
+
 # Set convenience flag to indicate that one of the ideal or adiabatic
 # modes is being used.
 my $simple_phys = 0;

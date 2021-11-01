@@ -92,6 +92,7 @@ subroutine cam_init(                                             &
 #if (defined BFB_CAM_SCAM_IOP)
    use history_defaults, only: initialize_iop_history
 #endif
+   use Dataconnector_mod,only: init_dataconnector_mod
 
    ! Arguments
    character(len=cl), intent(in) :: caseid                ! case ID
@@ -178,6 +179,9 @@ subroutine cam_init(                                             &
    call composition_init()
    ! initialize ionosphere
    call ionosphere_init()
+
+   ! Initialize Data Connector for inline regridding
+   call init_dataconnector_mod
 
    if (initial_run_in) then
 

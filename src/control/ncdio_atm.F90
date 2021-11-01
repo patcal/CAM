@@ -12,14 +12,18 @@ module ncdio_atm
 
   use pio, only: pio_offset_kind, file_desc_t, var_desc_t, pio_double,        &
        pio_inq_dimid, pio_max_var_dims, io_desc_t, pio_setframe
-  use shr_kind_mod,   only: r8 => shr_kind_r8
-  use shr_sys_mod,    only: shr_sys_flush      ! Standardized system subroutines
-  use shr_scam_mod,   only: shr_scam_getCloseLatLon  ! Standardized system subroutines
-  use spmd_utils,     only: masterproc
-  use cam_abortutils, only: endrun
-  use scamMod,        only: scmlat,scmlon,single_column
-  use cam_logfile,    only: iulog
-  use string_utils,   only: to_lower
+  use shr_kind_mod,     only: r8 => shr_kind_r8
+  use shr_sys_mod,      only: shr_sys_flush      ! Standardized system subroutines
+  use shr_scam_mod,     only: shr_scam_getCloseLatLon  ! Standardized system subroutines
+  use spmd_utils,       only: masterproc
+  use cam_abortutils,   only: endrun
+  use scamMod,          only: scmlat,scmlon,single_column
+  use cam_logfile,      only: iulog
+  use string_utils,     only: to_lower
+  use Dataset_mod,      only: dataset_t
+  use Dataconnector_mod,only: register_dataPath, apply_dataPath
+  use Hmaps_mod,        only: packed_hgrid_t
+  use Vmaps_mod,        only: vgrid_t
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -38,10 +42,17 @@ module ncdio_atm
      module procedure infld_real_2d_2d
      module procedure infld_real_2d_3d
      module procedure infld_real_3d_3d
+     module procedure infld_dataset_3d
+     module procedure infld_dataset_horiz
   end interface
 
 
   public :: infld
+  public :: register_infld_grid
+  public :: set_model_Hgrid
+  public :: set_model_Vgrid
+  private:: infld_dataset_3d
+  private:: infld_dataset_horiz
 
   integer STATUS
   real(r8) surfdat
@@ -928,5 +939,480 @@ contains
 
   end subroutine infld_real_3d_3d
 
+
+  !================================================================
+  subroutine register_infld_grid(DataSetID,PathID,I_HgridName,I_HmapOpt,I_VgridName,I_VmapOpt)
+    !
+    ! register_infld_grid: Register the given Horizontal/Vertical grid and
+    !                      mapping options for the given DataSet ID, and
+    !                      return the index for the correponding DataPath.
+    !==============================================================
+    use cam_grid_support,only: cam_grid_get_dim_names, cam_grid_get_array_bounds, cam_grid_id
+    !
+    ! Passed variables
+    !-------------------
+    integer                  ,intent(in ):: DataSetID
+    integer                  ,intent(out):: PathID
+    character(len=*)         ,intent(in ):: I_HgridName
+    character(len=*)         ,intent(in ):: I_HmapOpt
+    character(len=*),optional,intent(in ):: I_VgridName
+    character(len=*),optional,intent(in ):: I_VmapOpt
+    !
+    ! Local Values
+    !--------------
+    type(packed_hgrid_t):: Hgrid_m
+    type(vgrid_t       ):: Vgrid_m
+    character(len=32)   :: HmapOpt
+    character(len=32)   :: VmapOpt
+    character(len=32)   :: HgridName
+    character(len=32)   :: VgridName
+
+    HgridName = '                                '
+    HmapOpt   = '                                '
+    HgridName = trim(I_HgridName)
+    HmapOpt   = trim(I_HmapOpt)
+
+    if(present(I_VgridName).and.present(I_VmapOpt)) then
+      VgridName = '                                '
+      VmapOpt   = '                                '
+      VgridName = trim(I_VgridName)
+      VmapOpt   = trim(I_VmapOpt)
+    else
+      VgridName = '                                '
+      VmapOpt   = '                                '
+      VgridName = 'HORIZ_ONLY'
+      VmapOpt   = 'HORIZ_ONLY'
+    endif
+
+    ! Initialize Hgrid for the given model grid
+    !--------------------------------------------
+    call set_model_Hgrid(Hgrid_m,trim(HgridName))
+
+    ! If a VgridName and VmapOpt are present, use them,
+    ! otherwise set the vertical to HORIZ_ONLY
+    !---------------------------------------------------
+    if(present(I_VgridName).and.present(I_VmapOpt)) then
+      call set_model_Vgrid(Vgrid_m,trim(VgridName))
+      PathID = register_dataPath(DataSetID,Hgrid_m,trim(HmapOpt),Vgrid_m,trim(VmapOpt))
+    else
+      call set_model_Vgrid(Vgrid_m,'HORIZ_ONLY')
+      PathID = register_dataPath(DataSetID,Hgrid_m,trim(HmapOpt),Vgrid_m,'HORIZ_ONLY')
+    endif
+
+    ! End Routine
+    !------------------
+    return
+  end subroutine register_infld_grid
+  !================================================================
+
+
+  !================================================================
+  subroutine set_model_Hgrid(Hgrid_m,hgridname)
+    !
+    ! set_model_Hgrid: For the given hgridname, determine the packed set
+    !                  of unique gridpoints for the current PE and
+    !                  mapping indices back to model arrays. Then
+    !                  initialize the given model Hgrid datastructure
+    !==============================================================
+    use cam_grid_support,only: cam_grid_id, cam_grid_check, cam_grid_get_gcid
+    use cam_grid_support,only: cam_grid_get_array_bounds,cam_grid_get_local_size
+    use cam_grid_support,only: cam_grid_get_latvals, cam_grid_get_lonvals
+    use cam_grid_support,only: cam_grid_get_dim_names
+    use pio,             only: iMap=>PIO_OFFSET_KIND
+    !
+    ! Passed variables
+    !-------------------
+    type(packed_hgrid_t),intent(inout):: Hgrid_m
+    character(len=*)    ,intent(in   ):: hgridname
+    !
+    ! Local Values
+    !----------------
+    integer(iMap),pointer:: gcid(:)    => null()
+    real(r8)     ,pointer:: Lonvals(:) => null()
+    real(r8)     ,pointer:: Latvals(:) => null()
+    integer:: gridid
+    integer:: griddims(2,2)
+    integer:: PEsize
+    integer:: Lonsize
+    integer:: Latsize
+
+    integer             :: G_ncol
+    real(r8),allocatable:: G_Lon (:)
+    real(r8),allocatable:: G_Lat (:)
+    integer ,allocatable:: G_Xmap(:)
+    integer ,allocatable:: G_Ymap(:)
+
+    integer:: pcols,begchunk,endchunk,nchunks,ichunk
+    integer:: numx,numy,begx,begy,jind,ix,iy,ii
+    character(len=8):: dimname1,dimname2
+
+    ! check that the horizontal gridname is a valid grid
+    !-----------------------------------------------------
+    gridid = cam_grid_id(trim(hgridname))
+    if(.not. cam_grid_check(gridid)) then
+      write(iulog, *) 'set_model_Hgrid: Internal error, no ',trim(hgridname),' hgridname'
+      call endrun('ERROR: No GRIDNAME')
+    endif
+
+    ! This is a CAM grid, get the details from the gridid value
+    !----------------------------------------------------------
+    call cam_grid_get_gcid        (gridid,gcid)
+    call cam_grid_get_array_bounds(gridid,griddims)
+    call cam_grid_get_dim_names   (gridid,dimname1,dimname2)
+    Latvals => cam_grid_get_latvals(gridid)
+    Lonvals => cam_grid_get_lonvals(gridid)
+    PEsize   = cam_grid_get_local_size(gridid)
+    Latsize = size(Latvals)
+    Lonsize = size(Lonvals)
+
+    ! CHECK PEsize == size(gcid)
+    !---------------------------
+
+    ! Allocate some space
+    !----------------------
+    allocate(G_Lon (PEsize))
+    allocate(G_Lat (PEsize))
+    allocate(G_Xmap(PEsize))
+    allocate(G_Ymap(PEsize))
+
+    ! Branch to grid-type cases
+    !---------------------------
+    if((PEsize.eq.Lonsize).and.(PEsize.eq.Latsize)) then
+      ! Lat/Lon values are in an indexed map
+      !--------------------------------------
+      Hgrid_m%PackType = "UNSTRUCTURED"
+      pcols    = 1 + griddims(1,2) - griddims(1,1)
+      begchunk = griddims(2,1)
+      endchunk = griddims(2,2)
+      nchunks  = 1 + endchunk - begchunk
+
+      ! create a packed set of active gridpoints,
+      ! and a map to the values in the model array.
+      !--------------------------------------------
+      G_ncol = 0
+      do ii = 1, PEsize
+        if(gcid(ii).ge.1) then
+          ichunk = (ii-1)/pcols
+          G_ncol = G_ncol + 1
+          G_Xmap(G_ncol) = ii - pcols*ichunk
+          G_Ymap(G_ncol) = ichunk + begchunk
+          G_Lon (G_ncol) = Lonvals(ii)
+          G_Lat (G_ncol) = Latvals(ii)
+        endif
+      end do
+    elseif(PEsize.eq.(Lonsize*Latsize)) then
+      ! Lat/Lon values are in a rectilinear grid
+      !------------------------------------------
+      Hgrid_m%PackType = "LATLON"
+      numx = 1 + griddims(1,2) - griddims(1,1)
+      numy = 1 + griddims(2,2) - griddims(2,1)
+      begx = griddims(1,1)
+      begy = griddims(2,1)
+
+      ! create a packed set of active gridpoints,
+      ! and a map to the values in the model array.
+      !--------------------------------------------
+      G_ncol = 0
+      do ii = 1, PEsize
+        if(gcid(ii).ge.1) then
+          jind   = (ii-1)/numx
+          ix     = ii - jind*numx
+          iy     = 1  + jind
+          G_ncol = G_ncol + 1
+          G_Xmap(G_ncol) = begx + ix - 1
+          G_Ymap(G_ncol) = begy + iy - 1
+          G_Lon (G_ncol) = Lonvals(G_Xmap(G_ncol))
+          G_Lat (G_ncol) = Latvals(G_Ymap(G_ncol))
+        endif
+      end do
+    else
+      ! Unknown Case: Error stop!
+      !----------------------------
+      call endrun('ERROR: Mis-Match between PEsize and grid dimensions')
+    endif
+
+    ! Now Set the Hgrid values
+    !-----------------------------
+    Hgrid_m%name           = trim(hgridname)
+    Hgrid_m%Type           = "PACKED_MODEL"
+    Hgrid_m%model_gridname = trim(hgridname)
+    Hgrid_m%model_gridid   = gridid
+    Hgrid_m%ncol           = G_ncol
+    if(allocated(Hgrid_m%Lon )) deallocate(Hgrid_m%Lon )
+    if(allocated(Hgrid_m%Lat )) deallocate(Hgrid_m%Lat )
+    if(allocated(Hgrid_m%Xmap)) deallocate(Hgrid_m%Xmap)
+    if(allocated(Hgrid_m%Ymap)) deallocate(Hgrid_m%Ymap)
+    allocate(Hgrid_m%Lon (Hgrid_m%ncol))
+    allocate(Hgrid_m%Lat (Hgrid_m%ncol))
+    allocate(Hgrid_m%Xmap(Hgrid_m%ncol))
+    allocate(Hgrid_m%Ymap(Hgrid_m%ncol))
+    Hgrid_m%Xmap(:) = G_Xmap(1:Hgrid_m%ncol)
+    Hgrid_m%Ymap(:) = G_Ymap(1:Hgrid_m%ncol)
+    Hgrid_m%Lon (:) = G_Lon (1:Hgrid_m%ncol)
+    Hgrid_m%Lat (:) = G_Lat (1:Hgrid_m%ncol)
+
+    Hgrid_m%Hdim1name = trim(dimname1)
+    Hgrid_m%Hdim2name = trim(dimname2)
+    Hgrid_m%Hdim1b    = griddims(1,1)
+    Hgrid_m%Hdim1e    = griddims(1,2)
+    Hgrid_m%Hdim2b    = griddims(2,1)
+    Hgrid_m%Hdim2e    = griddims(2,2)
+    Hgrid_m%Hdim1len  = 1 + griddims(1,2) - griddims(1,1)
+    Hgrid_m%Hdim2len  = 1 + endchunk - begchunk
+
+    ! Clean up
+    !----------------
+    nullify(gcid   )
+    nullify(Lonvals)
+    nullify(Latvals)
+    deallocate(G_Lon )
+    deallocate(G_Lat )
+    deallocate(G_Xmap)
+    deallocate(G_Ymap)
+
+    !***************************
+    ! (Temporary) Diag output
+    !***************************
+    if(.FALSE.) then
+      write(iulog,*) 'PFCDIAG: Packed gridpoints for ',trim(Hgrid_m%name),' grid'
+      write(iulog,*) 'PFCDIAG: Hgrid_m%type          =',trim(Hgrid_m%Type)
+      write(iulog,*) 'PFCDIAG: Hgrid_m%PackType      =',trim(Hgrid_m%PackType)
+      write(iulog,*) 'PFCDIAG: Hgrid_m%model_gridname=',trim(Hgrid_m%model_gridname)
+      write(iulog,*) 'PFCDIAG: Hgrid_m%model_gridid  =',Hgrid_m%model_gridid
+      write(iulog,*) 'PFCDIAG: Hgrid_m%ncol          =',Hgrid_m%ncol
+      do ii=1,Hgrid_m%ncol
+        write(iulog,*) 'PFCDIAG: ii=',ii,' Lon/Lat=',Hgrid_m%Lon (ii),Hgrid_m%Lat (ii), &
+                                         ' X,Y Map=',Hgrid_m%Xmap(ii),Hgrid_m%Ymap(ii)
+      end do
+      write(iulog,*) 'PFCDIAG: '
+    endif
+
+    ! End Routine
+    !------------------
+    return
+  end subroutine set_model_Hgrid
+  !================================================================
+
+
+  !================================================================
+  subroutine set_model_Vgrid(Vgrid_m,vgridname)
+    !
+    ! set_model_Vgrid: For the given vgridname (either 'lev' or 'ilev'),
+    !                  initialize the given model Vgrid datastructure
+    !                  with model levels.
+    !==============================================================
+    use pmgrid,only: plev, plevp
+    use hycoef,only: hyam,hybm,hyai,hybi,ps0
+    !
+    ! Passed variables
+    !-------------------
+    type(vgrid_t)   ,intent(inout):: Vgrid_m
+    character(len=*),intent(in   ):: vgridname
+
+    ! Initialize Vertical datastructure with model coordinates
+    !-----------------------------------------------------------
+    if(trim(vgridname).eq.'lev') then
+      ! Mid points of Model Layers
+      !----------------------------
+      Vgrid_m%name      = "HYP_LEV"
+      Vgrid_m%Type      = "HYBRIDP"
+      Vgrid_m%Vdimname  = 'lev'
+      Vgrid_m%nlev      = plev
+      Vgrid_m%ngrid_var = 3
+      Vgrid_m%nreq_var  = 1
+      if(allocated(Vgrid_m%grid_var)) deallocate(Vgrid_m%grid_var)
+      if(allocated(Vgrid_m%req_var )) deallocate(Vgrid_m%req_var)
+      if(allocated(Vgrid_m%HYA     )) deallocate(Vgrid_m%HYA)
+      if(allocated(Vgrid_m%HYB     )) deallocate(Vgrid_m%HYB)
+      allocate(Vgrid_m%grid_var(Vgrid_m%ngrid_var))
+      allocate(Vgrid_m%req_var (Vgrid_m%nreq_var ))
+      allocate(Vgrid_m%HYA     (Vgrid_m%nlev))
+      allocate(Vgrid_m%HYB     (Vgrid_m%nlev))
+      Vgrid_m%grid_var(1) = "hyam"
+      Vgrid_m%grid_var(2) = "hybm"
+      Vgrid_m%grid_var(3) = "Pref"
+      Vgrid_m%req_var (1) = "PS"
+      Vgrid_m%HYA(1:plev) = hyam(1:plev)
+      Vgrid_m%HYB(1:plev) = hybm(1:plev)
+      Vgrid_m%Pref        = ps0
+    elseif(trim(vgridname).eq.'lev-index') then
+      ! Mid points of Model Layers
+      !----------------------------
+      Vgrid_m%name      = "lev"
+      Vgrid_m%Type      = "INDEX"
+      Vgrid_m%Vdimname  = 'lev'
+      Vgrid_m%nlev      = plev
+      Vgrid_m%ngrid_var = 1
+      Vgrid_m%nreq_var  = 0
+      if(allocated(Vgrid_m%grid_var)) deallocate(Vgrid_m%grid_var)
+      if(allocated(Vgrid_m%req_var )) deallocate(Vgrid_m%req_var)
+      if(allocated(Vgrid_m%HYA     )) deallocate(Vgrid_m%HYA)
+      if(allocated(Vgrid_m%HYB     )) deallocate(Vgrid_m%HYB)
+      allocate(Vgrid_m%grid_var(Vgrid_m%ngrid_var))
+      Vgrid_m%grid_var(1) = "ANYINDEX"
+    elseif(trim(vgridname).eq.'ilev') then
+      ! Interface points of Model Layers
+      !----------------------------------
+      Vgrid_m%name      = "HYP_ILEV"
+      Vgrid_m%Type      = "HYBRIDP"
+      Vgrid_m%Vdimname  = 'ilev'
+      Vgrid_m%nlev      = plevp
+      Vgrid_m%ngrid_var = 3
+      Vgrid_m%nreq_var  = 1
+      if(allocated(Vgrid_m%grid_var)) deallocate(Vgrid_m%grid_var)
+      if(allocated(Vgrid_m%req_var )) deallocate(Vgrid_m%req_var)
+      if(allocated(Vgrid_m%HYA     )) deallocate(Vgrid_m%HYA)
+      if(allocated(Vgrid_m%HYB     )) deallocate(Vgrid_m%HYB)
+      allocate(Vgrid_m%grid_var(Vgrid_m%ngrid_var))
+      allocate(Vgrid_m%req_var (Vgrid_m%nreq_var ))
+      allocate(Vgrid_m%HYA     (Vgrid_m%nlev))
+      allocate(Vgrid_m%HYB     (Vgrid_m%nlev))
+      Vgrid_m%grid_var(1)  = "hyai"
+      Vgrid_m%grid_var(2)  = "hybi"
+      Vgrid_m%grid_var(3)  = "Pref"
+      Vgrid_m%req_var (1)  = "PS"
+      Vgrid_m%HYA(1:plevp) = hyai(1:plevp)
+      Vgrid_m%HYB(1:plevp) = hybi(1:plevp)
+      Vgrid_m%Pref         = ps0
+    elseif(trim(vgridname).eq.'ilev-index') then
+      ! Interface points of Model Layers
+      !----------------------------------
+      Vgrid_m%name      = "ilev"
+      Vgrid_m%Type      = "INDEX"
+      Vgrid_m%Vdimname  = 'ilev'
+      Vgrid_m%nlev      = plevp
+      Vgrid_m%ngrid_var = 1
+      Vgrid_m%nreq_var  = 0
+      if(allocated(Vgrid_m%grid_var)) deallocate(Vgrid_m%grid_var)
+      if(allocated(Vgrid_m%req_var )) deallocate(Vgrid_m%req_var)
+      if(allocated(Vgrid_m%HYA     )) deallocate(Vgrid_m%HYA)
+      if(allocated(Vgrid_m%HYB     )) deallocate(Vgrid_m%HYB)
+      allocate(Vgrid_m%grid_var(Vgrid_m%ngrid_var))
+      Vgrid_m%grid_var(1)  = "ANYINDEX"
+    elseif(trim(vgridname).eq.'HORIZ_ONLY') then
+      ! Entry for HORIZ_ONLY (2D) arrays
+      !----------------------------------
+      Vgrid_m%name      = "HORIZ_ONLY"
+      Vgrid_m%Type      = "HORIZ_ONLY"
+      Vgrid_m%Vdimname  = 'HORIZ_ONLY'
+      Vgrid_m%nlev      = 1
+      Vgrid_m%ngrid_var = 0
+      Vgrid_m%nreq_var  = 0
+      if(allocated(Vgrid_m%grid_var)) deallocate(Vgrid_m%grid_var)
+      if(allocated(Vgrid_m%req_var )) deallocate(Vgrid_m%req_var)
+      if(allocated(Vgrid_m%HYA     )) deallocate(Vgrid_m%HYA)
+      if(allocated(Vgrid_m%HYB     )) deallocate(Vgrid_m%HYB)
+    else
+      ! Unknown Case: Error stop!
+      !----------------------------
+      call endrun('set_model_Vgrid: ERROR Unknown vgridname = '//trim(vgridname))
+    endif
+
+    ! End Routine
+    !------------------
+    return
+  end subroutine set_model_Vgrid
+  !================================================================
+
+
+  !================================================================
+  subroutine infld_dataset_3d(VarName,DataSetID,PathId,dimname1,dimname2,dimname3,          &
+                                                       dim1b,dim1e,dim2b,dim2e,dim3b,dim3e, &
+                                                       field,readvar,timelevel,fillvalue)
+    !
+    ! infld_dataset_3d: Read a 3D field from dataset into a 3D variable
+    !==============================================================
+    implicit none
+    !
+    ! Passed variables
+    !------------------
+    character(len=*) ,intent(in ):: VarName
+    integer          ,intent(in ):: DataSetID
+    integer          ,intent(in ):: PathID
+    character(len=*) ,intent(in ):: dimname1
+    character(len=*) ,intent(in ):: dimname2
+    character(len=*) ,intent(in ):: dimname3
+    integer          ,intent(in ):: dim1b
+    integer          ,intent(in ):: dim1e
+    integer          ,intent(in ):: dim2b
+    integer          ,intent(in ):: dim2e
+    integer          ,intent(in ):: dim3b
+    integer          ,intent(in ):: dim3e
+    real(r8),target  ,intent(out):: field(dim1b:dim1e,dim2b:dim2e,dim3b:dim3e)
+    logical          ,intent(out):: readvar
+    integer ,optional,intent(in ):: timelevel
+    real(r8),optional,intent(out):: fillvalue
+    !
+    ! Local Values
+    !--------------
+    integer :: time
+    real(r8):: DS_fillvalue
+
+    if(present(timelevel)) then
+      call apply_dataPath(DataSetID,PathID,VarName,timelevel,DS_fillvalue, &
+                                  dim1b,dim1e,dim2b,dim2e,dim3b,dim3e,field)
+    else
+      time = 1
+      call apply_dataPath(DataSetID,PathID,VarName,time,DS_fillvalue, &
+                             dim1b,dim1e,dim2b,dim2e,dim3b,dim3e,field)
+    endif
+    if(present(fillvalue)) fillvalue = DS_fillvalue
+
+    readvar = .true.
+
+    ! End Routine
+    !------------------
+    return
+  end subroutine infld_dataset_3d
+  !================================================================
+
+
+  !================================================================
+  subroutine infld_dataset_horiz(VarName,DataSetID,PathId,dimname1,dimname2,               &
+                                                          dim1b,dim1e,dim2b,dim2e,         &
+                                                          field,readvar,timelevel,fillvalue)
+    !
+    ! infld_dataset_horiz: Read a HORIZ_ONLY field from dataset into a 2D variable
+    !==============================================================
+    implicit none
+    !
+    ! Passed variables
+    !------------------
+    character(len=*) ,intent(in ):: VarName
+    integer          ,intent(in ):: DataSetID
+    integer          ,intent(in ):: PathID
+    character(len=*) ,intent(in ):: dimname1
+    character(len=*) ,intent(in ):: dimname2
+    integer          ,intent(in ):: dim1b
+    integer          ,intent(in ):: dim1e
+    integer          ,intent(in ):: dim2b
+    integer          ,intent(in ):: dim2e
+    real(r8),target  ,intent(out):: field(dim1b:dim1e,dim2b:dim2e)
+    logical          ,intent(out):: readvar
+    integer ,optional,intent(in ):: timelevel
+    real(r8),optional,intent(out):: fillvalue
+    !
+    ! Local Values
+    !--------------
+    integer :: time
+    real(r8):: DS_fillvalue
+
+    if(present(timelevel)) then
+      call apply_dataPath(DataSetID,PathID,VarName,timelevel,DS_fillvalue, &
+                                              dim1b,dim1e,dim2b,dim2e,field)
+    else
+      time = 1
+      call apply_dataPath(DataSetID,PathID,VarName,time,DS_fillvalue, &
+                                         dim1b,dim1e,dim2b,dim2e,field)
+    endif
+    if(present(fillvalue)) fillvalue = DS_fillvalue
+
+    readvar = .true.
+
+    ! End Routine
+    !------------------
+    return
+  end subroutine infld_dataset_horiz
+  !================================================================
 
 end module ncdio_atm
